@@ -21,7 +21,10 @@ cross-repository roadmap, and the page that says what each id means and which ev
 Derived from substrate: the bubblewrap isolation argument list in `src/confinement.rs` is a copy of
 `crates/substrate-host/src/process.rs:62,1911-1937` (`USER_NAMESPACE_ARGV` plus the `command.args`
 isolation set) at substrate 0.7.0, with the three differences named in that module's doc comment.
-Admitted as a substrate-derived tool by Atlas ADR 0052 (2026-09-15).
+Admitted as a substrate-derived tool by Atlas ADR 0052 (accepted 2026-09-15); that ADR defers both
+the `sandbox` catalog row and the `sandbox-derived-from-substrate-20260915` lineage record until
+`beyond10x/sandbox` exists as a GitHub repository, which it does not (`gh api repos/beyond10x/sandbox`
+→ 404 on 2026-09-15), so this repository has an admission but no catalog identity.
 Consumer: none yet — no repository beside this one names `b10x-sandbox`; a `grep -rlw` over the
 sibling repositories' `*.md`, `*.toml`, `*.yaml`, `*.sh` and `*.rs` on 2026-09-15 matched only that
 day's org-state review pages.
