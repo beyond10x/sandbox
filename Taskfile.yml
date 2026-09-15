@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  check:
+    desc: Format check, clippy with warnings denied, and the test suite
+    cmds:
+      - cargo fmt --all --check
+      - cargo clippy --all-targets --locked -- -D warnings
+      - cargo test --locked
+  build:
+    desc: Release build of the b10x-sandbox binary
+    cmds:
+      - cargo build --release --locked
+  install:
+    desc: Install b10x-sandbox into ~/.cargo/bin
+    cmds:
+      - cargo install --path . --locked --force

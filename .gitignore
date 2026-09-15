@@ -1,0 +1,4 @@
+/target/
+
+# Agent worktrees created by Claude Code isolation runs; never repository content.
+.claude/worktrees/
