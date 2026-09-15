@@ -9,7 +9,9 @@
 //!   the sysctl and refuses when it is `1` unless [`Options::allow_tiocsti`] is set;
 //! - **no seccomp filter**: substrate's socket-family filter is not carried yet;
 //! - **`/workspace` is a tmpfs with one bind per mapped directory**, remounted read-only so the
-//!   synthesized parents are not writable, where substrate binds one workspace directory.
+//!   synthesized parents are not writable, where substrate binds one workspace directory. The
+//!   default layout has no synthesized parents — the working directory is bound at `/workspace`
+//!   itself — and is not remounted, or the one directory the caller asked for would be read-only.
 
 use std::convert::Infallible;
 use std::ffi::{OsStr, OsString};
@@ -207,6 +209,13 @@ impl Confinement {
         }
 
         // 4. The mirrored workspace: tmpfs, one writable bind per directory, parents read-only.
+        //
+        // `--remount-ro` acts on the mount at that exact path and on nothing under it, so it makes
+        // the synthesized parents read-only while the binds beneath them stay writable. When a
+        // mapping *is* `/workspace` — the default layout, with no `--dir` — that same argument
+        // would remount the writable bind itself and leave the caller nothing to write to; there
+        // are no synthesized parents to protect in that case, so it is omitted.
+        let root_is_bound = self.layout.binds_workspace_root();
         push(&[o("--tmpfs"), o(WORKSPACE)]);
         for mapping in &self.layout.mappings {
             push(&[
@@ -215,7 +224,9 @@ impl Confinement {
                 mapping.mount.as_os_str(),
             ]);
         }
-        push(&[o("--remount-ro"), o(WORKSPACE)]);
+        if !root_is_bound {
+            push(&[o("--remount-ro"), o(WORKSPACE)]);
+        }
 
         // 5. Working directory and the shaped environment.
         push(&[o("--chdir"), self.layout.cwd.as_os_str(), o("--clearenv")]);
@@ -296,7 +307,7 @@ fn o(s: &str) -> &OsStr {
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use super::{Backend, Confinement, ConfinementError, Options, legacy_tiocsti_enabled};
     use crate::layout::{Layout, Mapping};
@@ -394,6 +405,50 @@ mod tests {
             "-l",
         ];
         assert_eq!(argv, expected);
+    }
+
+    /// The default layout exactly as [`Layout::plan`] computes it: no `--dir`, so the working
+    /// directory is the ancestor and is bound at `/workspace` itself.
+    fn default_layout() -> (tempfile::TempDir, Layout) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = std::fs::canonicalize(dir.path()).expect("canonical tempdir");
+        let layout = Layout::plan(&root, &[]).expect("layout");
+        (dir, layout)
+    }
+
+    #[test]
+    fn the_default_layout_binds_the_workspace_writable_and_is_not_remounted() {
+        let (_keep, layout) = default_layout();
+        let host = layout.mappings[0].host.clone();
+        let confinement = Confinement::new(layout, Options::default(), ["/bin/sh"]).expect("valid");
+        let argv = confinement.argv().unwrap();
+        let bind = argv.iter().position(|a| a == "--bind").expect("one bind");
+        assert_eq!(Path::new(&argv[bind + 1]), host);
+        assert_eq!(Path::new(&argv[bind + 2]), Path::new("/workspace"));
+        assert!(
+            !argv.iter().any(|a| a == "--remount-ro"),
+            "remounting /workspace read-only would take the only writable bind away: {argv:?}"
+        );
+    }
+
+    #[test]
+    fn a_mirrored_layout_still_remounts_the_synthesized_root_read_only() {
+        let confinement =
+            Confinement::new(two_directory_layout(), Options::default(), ["/bin/sh"]).unwrap();
+        let argv = confinement.argv().unwrap();
+        let remount = argv
+            .iter()
+            .position(|a| a == "--remount-ro")
+            .expect("present");
+        assert_eq!(argv[remount + 1], "/workspace");
+        let last_bind = argv
+            .iter()
+            .rposition(|a| a == "/workspace/lib")
+            .expect("present");
+        assert!(
+            last_bind < remount,
+            "the remount must follow every bind, or it would not cover the parents"
+        );
     }
 
     #[test]

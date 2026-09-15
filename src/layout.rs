@@ -102,6 +102,21 @@ impl Layout {
             mappings,
         })
     }
+
+    /// Whether a mapping is bound at `/workspace` itself rather than under it.
+    ///
+    /// True exactly when no `dirs` were declared: the working directory is then the ancestor and
+    /// the only input. With more than one input, an input equal to the ancestor is refused as
+    /// [`LayoutError::Nested`], so no mapping can cover the root.
+    ///
+    /// A backend asks this because there is nothing to synthesize in that case: the writable bind
+    /// *is* the workspace root, and the step that makes the synthesized parents read-only would
+    /// otherwise land on the bind the caller asked to be writable.
+    pub fn binds_workspace_root(&self) -> bool {
+        self.mappings
+            .iter()
+            .any(|mapping| mapping.mount == Path::new(WORKSPACE))
+    }
 }
 
 /// Refuse a path that is not absolute, not canonical, or not an existing directory.
@@ -155,7 +170,14 @@ fn mount_for(ancestor: &Path, host: &Path) -> PathBuf {
     let relative = host
         .strip_prefix(ancestor)
         .expect("every input starts with the ancestor");
-    Path::new(WORKSPACE).join(relative)
+    if relative.as_os_str().is_empty() {
+        // The input *is* the ancestor. `join("")` would append a separator and emit `/workspace/`
+        // — the same directory to the kernel and `==` to `/workspace` as a `Path`, but a different
+        // argument string in the argv a reader compares and a backend is handed.
+        PathBuf::from(WORKSPACE)
+    } else {
+        Path::new(WORKSPACE).join(relative)
+    }
 }
 
 #[cfg(test)]
@@ -186,6 +208,29 @@ mod tests {
                 host: root,
                 mount: PathBuf::from("/workspace")
             }]
+        );
+        // `PathBuf` equality ignores a trailing separator, so it would not see `/workspace/`;
+        // the argv a backend is handed does. Compare the string the backend will print.
+        assert_eq!(layout.cwd.as_os_str(), "/workspace");
+        assert_eq!(layout.mappings[0].mount.as_os_str(), "/workspace");
+    }
+
+    #[test]
+    fn only_the_default_layout_binds_the_workspace_root() {
+        let (_keep, root) = tree();
+        let default = Layout::plan(&root, &[]).expect("layout");
+        assert!(
+            default.binds_workspace_root(),
+            "the sole mapping is /workspace itself"
+        );
+        let a = root.join("x/a");
+        let b = root.join("y/z/b");
+        fs::create_dir_all(&a).unwrap();
+        fs::create_dir_all(&b).unwrap();
+        let mirrored = Layout::plan(&a, std::slice::from_ref(&b)).expect("layout");
+        assert!(
+            !mirrored.binds_workspace_root(),
+            "both mappings hang under a synthesized root"
         );
     }
 
