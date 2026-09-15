@@ -1,0 +1,76 @@
+# The gate for this repository: `task check`, run on a clean machine.
+#
+# Two of this repository's test files drive real confinement backends — `tests/bubblewrap.rs`
+# needs `bwrap`, `tests/docker.rs` needs a Docker daemon. Both report themselves *absent*
+# rather than passing when their backend is missing, and an absent case is not a passed one
+# (AGENTS.md invariant 1). So the runner installs bubblewrap, and the step below fails if
+# either backend went missing rather than letting the suite go green on a smaller surface.
+name: Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install the confinement backends the tests need
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          bwrap --version
+          docker version --format '{{.Server.Version}}'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.97'
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: task check
+        run: task check
+
+      - name: No confinement case went absent
+        run: |
+          set -euo pipefail
+          cargo test --locked -- --nocapture 2>&1 | tee /tmp/suite.log
+          if grep -q 'absent: confinement not observed' /tmp/suite.log; then
+            echo "::error::a confinement case reported itself absent; an absent case is not a passed one" >&2
+            grep -n 'absent: confinement not observed' /tmp/suite.log >&2
+            exit 1
+          fi
+
+      - name: The gate wrote nothing
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::the gate left the tree dirty" >&2
+            git status --porcelain >&2
+            exit 1
+          fi
