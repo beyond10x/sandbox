@@ -5,6 +5,31 @@
 # rather than passing when their backend is missing, and an absent case is not a passed one
 # (AGENTS.md invariant 1). So the runner installs bubblewrap, and the step below fails if
 # either backend went missing rather than letting the suite go green on a smaller surface.
+#
+# Installing `bwrap` is not sufficient on this image, and the difference is why this file has an
+# AppArmor step. `ubuntu-latest` is Ubuntu 24.04, where `kernel.apparmor_restrict_unprivileged_userns`
+# is 1: an unconfined process that creates an unprivileged user namespace is transitioned into the
+# `unprivileged_userns` profile, whose first rule is `audit deny capability`. Ubuntu ships a
+# `userns` profile for podman, crun, buildah, lxc-* and chrome, and none for bubblewrap, so `bwrap`
+# lands in that profile, creates its namespaces, and then cannot use CAP_NET_ADMIN to bring `lo` up
+# inside the network namespace it just unshared. Measured on the runner, 2026-09-18:
+#
+#     bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted
+#     apparmor="AUDIT"  operation="userns_create" profile="unconfined" comm="bwrap"
+#                       target="unprivileged_userns" execpath="/usr/bin/bwrap"
+#     apparmor="DENIED" operation="capable" profile="unprivileged_userns" comm="bwrap"
+#                       capability=12 capname="net_admin"
+#
+# bubblewrap calls `loopback_setup()` unconditionally under `--unshare-net` and dies when it fails
+# (`network.c:137-199` at 0.12.0); no flag unshares the network without bringing `lo` up. So the
+# only choices on this image are a host permitted to hold the sandbox, or no observation at all.
+#
+# `.github/apparmor/bwrap` is the first. It is provisioning, not posture: one permission for one
+# binary, the host-wide restriction left in force for everything else, and the isolation argument
+# list under test (AGENTS.md invariant 4) untouched — the suite that runs afterwards is the whole
+# suite, asserting the same properties it asserts on a developer's machine. The probe that follows
+# it is what keeps that honest: if a future image closes this door too, the gate fails naming the
+# runner, rather than a red suite nobody can read or — worse — a green one that observed nothing.
 name: Gate
 
 on:
@@ -41,7 +66,37 @@ jobs:
           bwrap --version
           docker version --format '{{.Server.Version}}'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Let this host hold an unprivileged user namespace for bwrap
+        run: |
+          set -euo pipefail
+          restriction=/proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          echo "apparmor_restrict_unprivileged_userns: $(cat $restriction 2>/dev/null || echo absent)"
+          sudo install -m 0644 .github/apparmor/bwrap /etc/apparmor.d/bwrap
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          # Still 1: the restriction stays in force for every program but the one named above.
+          echo "apparmor_restrict_unprivileged_userns: $(cat $restriction 2>/dev/null || echo absent)"
+
+      - name: The runner can hold the confinement this suite observes
+        run: |
+          set -euo pipefail
+          # The namespace half of `src/confinement.rs`, run before the suite so a runner that
+          # cannot hold it is named here rather than surfacing as an unreadable test failure.
+          if ! bwrap \
+              --unshare-user --disable-userns --unshare-ipc --unshare-pid --unshare-uts \
+              --unshare-net --die-with-parent \
+              --ro-bind /usr /usr --ro-bind-try /bin /bin --ro-bind-try /lib /lib \
+              --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev --tmpfs /tmp \
+              --clearenv --setenv PATH /usr/bin:/bin \
+              -- /bin/true 2>/tmp/probe.err; then
+            echo "::error::this runner refuses the namespaces bwrap needs: the bubblewrap confinement cannot be observed here, and the gate refuses rather than report a run that observed nothing" >&2
+            cat /tmp/probe.err >&2
+            cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns >&2 || true
+            sudo dmesg | grep -i apparmor | tail -20 >&2 || true
+            exit 1
+          fi
+          echo "bwrap held the isolation set: the confinement is observable on this runner"
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: '1.97'
           components: rustfmt, clippy

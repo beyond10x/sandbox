@@ -1,0 +1,25 @@
+# Grants /usr/bin/bwrap permission to create an unprivileged user namespace on a host where
+# `kernel.apparmor_restrict_unprivileged_userns` is 1 — Ubuntu 24.04 and later, including the
+# `ubuntu-latest` GitHub-hosted runner.
+#
+# Without it an unconfined process that unshares a user namespace is transitioned into the
+# `unprivileged_userns` profile, whose first rule is `audit deny capability`. bubblewrap then
+# still creates the namespaces, but cannot use CAP_NET_ADMIN to bring `lo` up inside the network
+# namespace it unshared, and dies: `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.
+#
+# This is the same shape of profile Ubuntu ships for podman, crun, buildah, lxc-* and chrome. It
+# grants one permission to one binary and leaves the host-wide restriction in force for every
+# other program. It does not touch what the sandbox itself confines: that is the argument list in
+# `src/confinement.rs`, which is unchanged by whether this file is installed.
+#
+# Load with: sudo install -m 0644 .github/apparmor/bwrap /etc/apparmor.d/bwrap
+#            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+
+  include if exists <local/bwrap>
+}
