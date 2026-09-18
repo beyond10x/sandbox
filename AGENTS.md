@@ -26,9 +26,17 @@ the `sandbox` catalog row and the `sandbox-derived-from-substrate-20260915` line
 `beyond10x/sandbox` existed as a GitHub repository. **It exists since 2026-09-15**, public, and this
 tree is published to it, so the condition the ADR waited on is met and the two catalog records are
 owed. Until Atlas writes them this repository has an admission and a remote but no catalog identity.
-Consumer: none yet — no repository beside this one names `b10x-sandbox`; a `grep -rlw` over the
-sibling repositories' `*.md`, `*.toml`, `*.yaml`, `*.sh` and `*.rs` on 2026-09-15 matched only that
-day's org-state review pages.
+Consumer: **`atlas`, since 2026-09-18.** `atlas/scripts/o6-loop.sh:74,93` requires this binary by
+name and refuses to measure without it, and `atlas/crates/o6-loop` records the `bwrap` argv it
+produced into every observation it writes (`confinement.argv_digest`). The O6 self-improvement loop
+builds and replays each candidate inside this sandbox with the network namespace unshared, which is
+what lets it say "no provider was called" as a property of the run rather than a claim.
+
+The sentence this replaces read "Consumer: none yet — no repository beside this one names
+`b10x-sandbox`", from a `grep -rlw` over the sibling repositories on 2026-09-15 that matched only
+that day's org-state review pages. It was true when written and is now false; it is recorded here
+rather than deleted, because a claim that changed is worth more than a claim that was quietly
+corrected.
 
 ## Invariants
 
