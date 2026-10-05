@@ -1,0 +1,90 @@
+{
+  "format": "b10x-product-landing/1",
+  "product": {
+    "name": "Sandbox",
+    "mark": "Sb",
+    "eyebrow": "Local confinement · early",
+    "promise": [
+      "Your project, writable.",
+      "The rest of the host, absent."
+    ],
+    "lede": "b10x-sandbox respawns your shell, or one command, inside a bubblewrap sandbox. The current directory is writable at /workspace, the directories you name with --dir are mirrored beside it, toolchain homes can be added read-only with --ro, and nothing else from the host is visible apart from /usr, /bin, /lib and /lib64. No network unless --net. It is a wrapper with Substrate's namespace and mount posture, not a daemon.",
+    "actions": [
+      {
+        "label": "Get started",
+        "href": "/docs/getting-started",
+        "kind": "primary"
+      },
+      {
+        "label": "Read the documentation",
+        "href": "/docs/"
+      },
+      {
+        "label": "What exists today",
+        "href": "/docs/status"
+      }
+    ],
+    "meta": "Rust library and CLI · Linux · bubblewrap or Docker · Apache-2.0",
+    "art": {
+      "kind": "terminal",
+      "session": "data/terminal.json"
+    },
+    "kpis": [
+      "shipped"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "features",
+      "eyebrow": "What it does",
+      "title": "Name what the process may see.",
+      "lede": "Every host directory enters the sandbox through --dir or --ro, and every other path is simply not mounted. A path that does not fit is refused by name, never adjusted.",
+      "items": [
+        {
+          "title": "Substrate's isolation set",
+          "description": "Own user, ipc, pid, uts and net namespaces, no nested user namespace, private /proc /dev /tmp, a cleared environment, and death with the parent.",
+          "status": "shipped",
+          "href": "/docs/concepts/confinement"
+        },
+        {
+          "title": "A mirrored workspace",
+          "description": "With --dir, the common ancestor becomes /workspace and each directory sits at its relative path, so ../lib resolves exactly as on the host.",
+          "status": "shipped",
+          "href": "/docs/concepts/workspace-layout"
+        },
+        {
+          "title": "Refusal, never fallback",
+          "description": "No bwrap or no docker exits 2 with the program's name. Nothing runs unconfined, and nothing silently switches backend.",
+          "status": "shipped",
+          "href": "/docs/concepts/confinement#refusals"
+        },
+        {
+          "title": "Bubblewrap or Docker",
+          "description": "Bubblewrap is the default; --backend docker runs the same layout as your uid with no capabilities and a read-only image root.",
+          "status": "shipped",
+          "href": "/docs/guides/use-the-docker-backend"
+        }
+      ]
+    },
+    {
+      "kind": "status",
+      "eyebrow": "Status",
+      "title": "Early. Here is exactly what exists.",
+      "lede": "Shipped means code on main, held by a named test. Nothing is released yet: build from source.",
+      "items": "data/status.json"
+    },
+    {
+      "kind": "related",
+      "eyebrow": "Related tools",
+      "title": "Where Sandbox sits.",
+      "tools": [
+        {
+          "name": "Substrate",
+          "description": "The governed execution service whose bubblewrap namespace and mount set this tool copies; it adds what this does not have: cgroup bounds, quotas, a seccomp filter and a durable operation record.",
+          "href": "https://beyond10x.github.io/substrate/",
+          "mark": "Su"
+        }
+      ]
+    }
+  ]
+}

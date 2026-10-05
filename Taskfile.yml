@@ -2,16 +2,31 @@ version: '3'
 
 tasks:
   check:
-    desc: Format check, clippy with warnings denied, and the test suite
+    desc: Format check, clippy with warnings denied, the test suite, and the generated docs current
     cmds:
       - cargo fmt --all --check
-      - cargo clippy --all-targets --locked -- -D warnings
-      - cargo test --locked
+      - cargo clippy --workspace --all-targets --locked -- -D warnings
+      - cargo test --workspace --locked
+      - task: docs-check
   build:
     desc: Release build of the b10x-sandbox binary
     cmds:
-      - cargo build --release --locked
+      - cargo build --release --locked -p b10x-sandbox
   install:
     desc: Install b10x-sandbox into ~/.cargo/bin
     cmds:
       - cargo install --path . --locked --force
+  docs-generate:
+    desc: Regenerate the derived pages under website/docs/reference/ and website/data/status.json
+    cmds:
+      - cargo run --locked -p sandbox-docs -- generate
+  docs-check:
+    desc: Fail when a generated page is missing, stale or edited by hand
+    cmds:
+      - cargo run --locked -p sandbox-docs -- generate --check
+  website:
+    desc: Build the documentation site, as the Documentation validation workflow does
+    dir: website
+    cmds:
+      - npm ci
+      - npm run build

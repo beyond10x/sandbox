@@ -1,65 +1,19 @@
 //! `b10x-sandbox`: respawn the current shell inside a bubblewrap sandbox.
 //!
-//! Clap over the library and nothing else. The one convenience this file adds is resolving a
-//! relative `--dir` or `--ro` against the caller's working directory, lexically, so `../lib` is
-//! usable from a shell; a symlink in the result is still refused by the library.
+//! The library's [`b10x_sandbox::cli::Cli`] parsed, and nothing else. The one convenience this
+//! file adds is resolving a relative `--dir` or `--ro` against the caller's working directory,
+//! lexically, so `../lib` is usable from a shell; a symlink in the result is still refused by the
+//! library.
 
 use std::ffi::OsString;
 use std::io::{IsTerminal as _, Write as _};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, ValueEnum};
+use clap::Parser as _;
 
+use b10x_sandbox::cli::{BackendChoice, Cli};
 use b10x_sandbox::{Backend, Confinement, Layout, Options};
-
-/// Respawn the current shell inside a bubblewrap sandbox.
-///
-/// The working directory is bound writable at /workspace. With --dir, the common ancestor of the
-/// working directory and every --dir becomes /workspace and each directory is bound at its path
-/// relative to that ancestor; nothing in between is visible. No network unless --net.
-#[derive(Debug, Parser)]
-#[command(name = "b10x-sandbox", version, about, long_about)]
-struct Cli {
-    /// A host directory to bind writable, mirrored under /workspace. Repeatable.
-    #[arg(long = "dir", value_name = "PATH")]
-    dirs: Vec<PathBuf>,
-
-    /// A host directory to bind read-only at its own path, such as a toolchain home. Repeatable.
-    #[arg(long = "ro", value_name = "PATH")]
-    read_only: Vec<PathBuf>,
-
-    /// Keep the host network namespace.
-    #[arg(long)]
-    net: bool,
-
-    /// Which program confines the process.
-    #[arg(long, value_enum, default_value_t = BackendChoice::Bubblewrap)]
-    backend: BackendChoice,
-
-    /// The image for --backend docker.
-    #[arg(long, value_name = "NAME", default_value = b10x_sandbox::docker::DEFAULT_IMAGE)]
-    image: String,
-
-    /// Run even when `dev.tty.legacy_tiocsti` is 1.
-    #[arg(long)]
-    allow_tiocsti: bool,
-
-    /// Print the bwrap argv, one argument per line, and exit without running it.
-    #[arg(long)]
-    dry_run: bool,
-
-    /// The command to run. Default: $SHELL (or /bin/sh when unset) under bubblewrap, /bin/sh
-    /// under docker, where the image decides which shells exist.
-    #[arg(value_name = "CMD", trailing_var_arg = true)]
-    command: Vec<OsString>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum BackendChoice {
-    Bubblewrap,
-    Docker,
-}
 
 fn main() -> ExitCode {
     let cli = Cli::parse();

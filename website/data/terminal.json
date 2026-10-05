@@ -1,0 +1,25 @@
+{
+  "format": "b10x-terminal/1",
+  "title": "Inside the sandbox, from a project directory",
+  "recordedWith": "b10x-sandbox 0.1.0, bubblewrap 0.12.0",
+  "entries": [
+    {
+      "command": "b10x-sandbox -- sh -c 'pwd; ls /; ls /home'",
+      "output": "/workspace\nbin\ndev\nlib\nlib64\nproc\ntmp\nusr\nworkspace\nls: cannot access '/home': No such file or directory",
+      "exitCode": 2,
+      "comment": "The project is /workspace; the rest of the host is not there."
+    },
+    {
+      "command": "b10x-sandbox --dir ../lib -- sh -c 'pwd; cat ../lib/note.txt; touch /workspace/new'",
+      "output": "/workspace/app\nhello from lib\ntouch: cannot touch '/workspace/new': Read-only file system",
+      "exitCode": 1,
+      "comment": "Two directories, mirrored; the parent between them takes no writes."
+    },
+    {
+      "command": "b10x-sandbox -- ip -brief link",
+      "output": "lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP>",
+      "exitCode": 0,
+      "comment": "No network unless --net."
+    }
+  ]
+}
