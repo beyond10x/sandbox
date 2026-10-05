@@ -1,0 +1,77 @@
+{
+  "asOf": "2026-10-05",
+  "format": "b10x-status/1",
+  "items": [
+    {
+      "area": "Confinement",
+      "detail": "User, ipc, pid, uts and net namespaces unshared, no nested user namespace, /usr /bin /lib /lib64 read-only, private /proc /dev /tmp, cleared environment, dies with its parent.",
+      "href": "/docs/concepts/confinement",
+      "label": "Substrate's namespace and mount set under bubblewrap",
+      "status": "shipped"
+    },
+    {
+      "area": "Confinement",
+      "detail": "--net keeps the host network namespace and changes nothing else in the list.",
+      "href": "/docs/concepts/confinement",
+      "label": "No network unless asked",
+      "status": "shipped"
+    },
+    {
+      "area": "Confinement",
+      "detail": "Observed under bwrap: a sibling of the working directory cannot be read, and a --ro root can be read but not written.",
+      "href": "/docs/concepts/confinement",
+      "label": "Undeclared host paths are absent",
+      "status": "shipped"
+    },
+    {
+      "area": "Confinement",
+      "detail": "Refuses to run when dev.tty.legacy_tiocsti is 1, unless --allow-tiocsti; it stands in for bwrap --new-session.",
+      "href": "/docs/concepts/confinement#the-terminal",
+      "label": "Terminal-injection guard",
+      "status": "shipped"
+    },
+    {
+      "area": "Layout",
+      "detail": "The common ancestor becomes /workspace; each directory is bound at its relative path, so ../lib resolves as on the host.",
+      "href": "/docs/concepts/workspace-layout",
+      "label": "Mirrored /workspace with --dir",
+      "status": "shipped"
+    },
+    {
+      "area": "Layout",
+      "detail": "Relative, non-canonical, missing, duplicated and nested inputs are each a named error.",
+      "href": "/docs/concepts/workspace-layout#refusals",
+      "label": "Input paths refused, never adjusted",
+      "status": "shipped"
+    },
+    {
+      "area": "Backends",
+      "detail": "--backend docker: the same layout through docker run as the caller's uid, no capabilities, no network, read-only image root.",
+      "href": "/docs/guides/use-the-docker-backend",
+      "label": "Docker backend",
+      "status": "shipped"
+    },
+    {
+      "area": "Backends",
+      "detail": "No bwrap or no docker exits 2 with the program's name; nothing runs unconfined or on the other backend.",
+      "href": "/docs/concepts/confinement#refusals",
+      "label": "A missing backend is a refusal, never a fallback",
+      "status": "shipped"
+    },
+    {
+      "area": "Interfaces",
+      "detail": "--dir, --ro, --net, --backend, --image, --dry-run, --allow-tiocsti and a trailing command.",
+      "href": "/docs/reference/cli",
+      "label": "b10x-sandbox command line",
+      "status": "shipped"
+    },
+    {
+      "area": "Interfaces",
+      "detail": "Layout::plan, Confinement::new, argv, command and run: the same computation the command line uses.",
+      "href": "/docs/guides/embed-the-library",
+      "label": "b10x_sandbox Rust library",
+      "status": "shipped"
+    }
+  ],
+  "source": "sandbox-docs, from its capability list; every shipped item names the test that holds it"
+}
